@@ -19,7 +19,7 @@ services:
   redis:
     image: redis
     restart: always
-    command: redis-server --requirepass $${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD} --port ${REDIS_PORT}
     ports:
       - 16379:16379
     env_file:
