@@ -1,8 +1,10 @@
 
 services:
   nodejs-data-caching:
-    image: nodejs-data-caching-image
-    command: yarn start:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: npm start
     ports:
       - 4000:4000
     env_file:
