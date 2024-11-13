@@ -3,16 +3,22 @@ const dotenv = require('dotenv');
 dotenv.config({
     path: './envs/.env'
 });
-
-const { tryToConnect } = require('./DBConnection');
+console.log(process.env)
+const DBConnection = require('./DBConnection');
+const RedisConnection = require('./RedisConnection');
 const {FilmService} = require("./services/filmService");
 const url = require('url');
-
+const NodeCache = require("node-cache");
 
 const port = process.env.PORT;
 
+const nodeCache = new NodeCache({
+    stdTTL: 15
+});
+
 const server = createServer(async (req, res) => {
-    await tryToConnect();
+    await DBConnection.tryToConnect();
+    await RedisConnection.tryToConnect();
 
     let parsedUrl = url.parse(req.url, true);
     let pathname = parsedUrl.pathname;
@@ -26,12 +32,31 @@ const server = createServer(async (req, res) => {
         }
 
         if (title) {
-            let films = await FilmService.getFilmByName(title);
+            if (nodeCache.has(title)) {
+                let cacheValue = nodeCache.get(title);
+
+                res.write(cacheValue);
+                res.end();
+                return;
+            }
+
+            if (await RedisConnection.redisClient.exists(title)) {
+                let cacheValue = await RedisConnection.redisClient.get(title);
+
+                res.write(JSON.parse(cacheValue));
+                res.end();
+                return;
+            }
+
+            let film = await FilmService.getFilmByName(title);
 
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
-            res.write(JSON.stringify(films));
+            res.write(JSON.stringify(film));
             res.end();
+
+            await RedisConnection.redisClient.set(title, JSON.stringify(film));
+            await RedisConnection.redisClient.expire(title, 30);
             return;
         }
 
